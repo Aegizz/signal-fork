@@ -12,6 +12,8 @@
 #include "client.h"
 #include "websocket_metadata.h"
 
+class SignedData;
+
 class websocket_endpoint {
 public:
     websocket_endpoint (std::string fingerprint, EVP_PKEY* privateKey) : m_next_id(0){
@@ -52,55 +54,48 @@ public:
     int connect(std::string const & uri, ClientList * global_client_list) {
         websocketpp::lib::error_code ec;
 
-        // Check if no other connections exist
-        if(m_connection_list.size() == 0){
-            client::connection_ptr con = m_endpoint.get_connection(uri, ec);
+        client::connection_ptr con = m_endpoint.get_connection(uri, ec);
 
-            if (ec) {
-                std::cout << "> Connect initialization error: " << ec.message() << std::endl;
-                return -1;
-            }
-
-            int new_id = m_next_id++;
-            connection_metadata::ptr metadata_ptr(new connection_metadata(new_id, con->get_handle(), uri, global_client_list));
-            m_connection_list[new_id] = metadata_ptr;
-
-            con->set_open_handler(websocketpp::lib::bind(
-                &connection_metadata::on_open,
-                metadata_ptr,
-                &m_endpoint,
-                websocketpp::lib::placeholders::_1
-            ));
-            con->set_fail_handler(websocketpp::lib::bind(
-                &connection_metadata::on_fail,
-                metadata_ptr,
-                &m_endpoint,
-                websocketpp::lib::placeholders::_1,
-                &m_connection_list
-            ));
-            con->set_close_handler(websocketpp::lib::bind(
-                &connection_metadata::on_close,
-                metadata_ptr,
-                &m_endpoint,
-                websocketpp::lib::placeholders::_1
-            ));
-            con->set_message_handler(websocketpp::lib::bind(
-                &connection_metadata::on_message,
-                metadata_ptr,
-                &m_endpoint,
-                websocketpp::lib::placeholders::_1,
-                websocketpp::lib::placeholders::_2,
-                m_fingerprint,
-                m_privateKey
-            ));
-
-            m_endpoint.connect(con);
-
-            return new_id;
-        }else{
-            std::cout << "You cannot connect to more than one server" << std::endl;
+        if (ec) {
+            std::cout << "> Connect initialization error: " << ec.message() << std::endl;
             return -1;
         }
+
+        int new_id = m_next_id++;
+        connection_metadata::ptr metadata_ptr(new connection_metadata(new_id, con->get_handle(), uri, global_client_list));
+        m_connection_list[new_id] = metadata_ptr;
+
+        con->set_open_handler(websocketpp::lib::bind(
+            &connection_metadata::on_open,
+            metadata_ptr,
+            &m_endpoint,
+            websocketpp::lib::placeholders::_1
+        ));
+        con->set_fail_handler(websocketpp::lib::bind(
+            &connection_metadata::on_fail,
+            metadata_ptr,
+            &m_endpoint,
+            websocketpp::lib::placeholders::_1
+        ));
+        con->set_close_handler(websocketpp::lib::bind(
+            &connection_metadata::on_close,
+            metadata_ptr,
+            &m_endpoint,
+            websocketpp::lib::placeholders::_1
+        ));
+        con->set_message_handler(websocketpp::lib::bind(
+            &connection_metadata::on_message,
+            metadata_ptr,
+            &m_endpoint,
+            websocketpp::lib::placeholders::_1,
+            websocketpp::lib::placeholders::_2,
+            m_fingerprint,
+            m_privateKey
+        ));
+
+        m_endpoint.connect(con);
+
+        return new_id;
     }
     void send(int id, const std::string& message, websocketpp::frame::opcode::value opcode, websocketpp::lib::error_code& ec) {
         // Get connection handle from connection id

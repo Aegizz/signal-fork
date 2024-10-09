@@ -67,12 +67,13 @@ std::ostream & operator<< (std::ostream & out, connection_metadata const & data)
     out << "> URI: " << data.m_uri << "\n"
         << "> Status: " << data.m_status << "\n"
         << "> Remote Server: " << (data.m_server.empty() ? "None Specified" : data.m_server) << "\n"
-        << "> Error/close reason: " << (data.m_error_reason.empty() ? "N/A" : data.m_error_reason);
+        << "> Error/close reason: " << (data.m_error_reason.empty() ? "N/A" : data.m_error_reason) << "\n";
 
     return out;
 }
 
 int main() {
+    int numConnections=0;
     // Load keys
     privKey = Client_Key_Gen::loadPrivateKey(privFileName.c_str());
     pubKey = Client_Key_Gen::loadPublicKey(pubFileName.c_str());
@@ -106,18 +107,24 @@ int main() {
         std::getline(std::cin, input);
 
         if (input == "quit") { // Quit program
+            endpoint.close(currentID, websocketpp::close::status::normal, "Client logging off");
             done = true;
         } else if (input == "help") { // Display command help
             std::cout
                 << "\nCommand List:\n"
                 << "connect\n"
                 << "send <message type>\n"
-                << "close [<close code:default=1000>] [<close reason>]\n"
+                << "close [<close code:default=1000>]\n"
                 << "show\n"
                 << "help: Display this help text\n"
                 << "quit: Exit the program\n"
                 << std::endl;
         } else if (input == "connect") { // If connect was entered
+            if(numConnections > 0){
+                std::cout << "You cannot connect to more than one server" << std::endl;
+                continue;
+            }
+
             bool validUri=false;
             // Keep looping until a valid URI has been entered
             while(!validUri){
@@ -148,6 +155,8 @@ int main() {
                                 continue;
                             }else if(metadata->get_status() == "Open"){ // If the connection succeeded send confirmation messages
                                 std::cout << "> Established connection with " << uri << std::endl;
+                                numConnections++;
+
                                 // Send hello message
                                 ClientUtilities::send_hello_message(&endpoint, currentID, privKey, pubKey, 12345);
 
@@ -164,12 +173,12 @@ int main() {
                     continue;
                 }
             }
-        } else if (input.substr(0,5) == "close") { // If close was entered
+        } else if (input == "close") { // If close was entered
             std::stringstream ss(input);
             
             std::string cmd;
             int close_code = websocketpp::close::status::normal;
-            std::string reason;
+            std::string reason = "Client logging off";
             
             ss >> cmd >> close_code;
 
@@ -179,10 +188,10 @@ int main() {
                 continue;
             }
 
-            // Get reason and close the connection
-            std::getline(ss,reason);
             endpoint.close(currentID, close_code, reason);
-        }  else if (input.substr(0,4) == "show") { // If show was entered
+
+            numConnections--;
+        }  else if (input == "show") { // If show was entered
             
             // Obtain metadata and print it
             connection_metadata::ptr metadata = endpoint.get_metadata(currentID);

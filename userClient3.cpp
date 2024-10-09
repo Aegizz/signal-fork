@@ -50,7 +50,7 @@
 #include "client/Fingerprint.h" // For fingerprint generation
 
 // Used to differentiate client processses locally
-const int ClientNumber = 2;
+const int ClientNumber = 3;
 
 // Create key file names
 std::string privFileName = "client/private_key" + std::to_string(ClientNumber) + ".pem";

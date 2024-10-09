@@ -1,5 +1,5 @@
-#ifndef WEBSOCKET_CONNECTION_METADATA_H
-#define WEBSOCKET_CONNECTION_METADATA_H
+#ifndef WEBSOCKET_METADATA_H
+#define WEBSOCKET_METADATA_H
 
 #include <vector>
 
@@ -16,6 +16,9 @@
 #include "hexToBytes.h"
 #include "client_signature.h"
 #include "client_key_gen.h"
+#include "signed_data.h"
+
+class websocket_endpoint;
 
 class connection_metadata {
 private:
@@ -40,13 +43,12 @@ public:
         m_server = con->get_response_header("Server");
     }
 
-    void on_fail(client * c, websocketpp::connection_hdl hdl, std::map<int, connection_metadata::ptr>* m_connection_list) {
+    void on_fail(client * c, websocketpp::connection_hdl hdl) {
         m_status = "Failed";
 
         client::connection_ptr con = c->get_con_from_hdl(hdl);
         m_server = con->get_response_header("Server");
         m_error_reason = con->get_ec().message();
-        m_connection_list->clear();
     }
     
     void on_close(client * c, websocketpp::connection_hdl hdl) {
@@ -75,7 +77,7 @@ public:
         }
 
         if(messageJSON["type"] == "client_list"){
-            std::cout << "\n\nClient list received" << std::endl;
+            std::cout << "\nClient list received" << std::endl;
 
             global_client_list->update(messageJSON);
             std::cout << "\n";
@@ -108,7 +110,59 @@ public:
             std::cout << "Public chat received from client " << client_id << " on server " << server_id << std::endl;
             std::cout << data["message"] << std::endl;
         }else if(data["type"] == "chat"){
-            
+            std::string decrypted_str = SignedData::decryptSignedMessage(messageJSON.dump(), privateKey);
+
+            if(decrypted_str == ""){
+                return;
+            }
+
+            try {
+                // Attempt to parse the string as JSON
+                nlohmann::json chat = nlohmann::json::parse(decrypted_str);
+                
+                // Convert participants to a std::vector<std::string>
+                std::vector<std::string> participants = chat["participants"].get<std::vector<std::string>>();
+
+                // If parsing is successful, you can work with the JSON object
+                std::pair<int, std::pair<int, std::string>> chatInfo = global_client_list->retrieveClientFromFingerprint(participants[0]);
+                if(chatInfo.first == -1){
+                    std::cout<<"Invalid fingerprint received in message"<<std::endl;
+                    return;
+                }
+
+                int server_id = chatInfo.first;
+                int client_id = chatInfo.second.first;
+                std::string public_key = chatInfo.second.second;
+                EVP_PKEY* pubKey = Client_Key_Gen::stringToPEM(public_key);
+
+                std::string signature = messageJSON["signature"];
+                int counter = messageJSON["counter"];
+
+                if(!ClientSignature::verifySignature(signature, data.dump() + std::to_string(counter), pubKey)){
+                    std::cout << "Invalid signature" << std::endl;
+                    return;
+                }
+                std::cout << "Verified signature\n" << std::endl;
+
+                std::cout << "Chat received from client " << client_id << " on server " << server_id << std::endl << std::endl;
+                std::cout << chat["message"] << "\n" << std::endl;
+                std::cout << "All recipients:" << std::endl;
+                for(int i=1; i<(int)participants.size(); i++){
+                    std::pair<int, std::pair<int, std::string>> chatInfo = global_client_list->retrieveClientFromFingerprint(participants[i]);
+                    if(chatInfo.first == -1){
+                        std::cout<<"Invalid recipient fingerprint received in message"<<std::endl;
+                        continue;
+                    }
+                    server_id = chatInfo.first;
+                    client_id = chatInfo.second.first;
+                    std::cout << "ServerID: " << server_id << " ClientID: " << client_id << std::endl;
+                }
+            }catch (nlohmann::json::parse_error& e) {
+                // Catch parse error exception and display error message
+                std::cerr << "Decrypted message is an Invalid JSON format: " << e.what() << std::endl;
+            }
+
+            /*
             // Decode cipher text and IV from Base64 into hex, then convert from hex to bytes
             std::string ciphertextHex = Base64::decode(data["chat"]);
             std::string ciphertextString = hexToBytesString(ciphertextHex);
@@ -200,6 +254,7 @@ public:
                 }
             }
 
+            */
             
         }else{
             // Print the received message

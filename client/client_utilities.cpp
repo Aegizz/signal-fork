@@ -78,7 +78,7 @@ void ClientUtilities::send_public_chat(websocket_endpoint* endpoint, int id, std
     if (ec) {
         std::cout << "> Error sending public chat message: " << ec.message() << std::endl;
     } else {
-        std::cout << ">  Public chat message sent" << "\n" << std::endl;
+        std::cout << ">  Public chat message sent" << std::endl;
     }
 }
 
@@ -94,6 +94,6 @@ void ClientUtilities::send_chat(websocket_endpoint* endpoint, int connection_id,
     if (ec) {
         std::cout << "> Error sending chat message: " << ec.message() << std::endl;
     } else {
-        std::cout << ">  Chat message sent" << "\n" << std::endl;
+        std::cout << ">  Chat message sent" <<  std::endl;
     }
 }

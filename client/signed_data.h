@@ -3,11 +3,14 @@
 #include <string>
 #include <vector>
 #include <openssl/pem.h>
-#include "websocket_endpoint.h"
 #include <nlohmann/json.hpp>
 #include "client_signature.h"
 #include "client_key_gen.h"
 #include "base64.h"
+#include "hexToBytes.h"
+
+class websocket_endpoint;
+
 class SignedData{
     public:
         /* 

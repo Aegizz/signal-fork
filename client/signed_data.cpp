@@ -1,5 +1,5 @@
 #include "signed_data.h"
-#include "hexToBytes.h"
+#include "websocket_endpoint.h"
 
 
 void SignedData::sendSignedMessage(std::string data, EVP_PKEY * private_key, websocket_endpoint* endpoint, int id, int counter) {
@@ -155,7 +155,7 @@ std::string SignedData::decryptSignedMessage(std::string message, EVP_PKEY * pri
     }  else {
         std::cerr << "symm_keys is not an array!" <<std::endl;
     }
-    std::cerr << "Could not decrypt the message" << std::endl;
+    std::cerr << "Message was not meant for you" << std::endl;
     return "";
 }
 

@@ -11,6 +11,7 @@
 #include "server_key_gen.h"
 #include "../client/Sha256Hash.h"
 #include "../client/base64.h"
+#include "../client/hexToBytes.h"
 
 class ServerSignature{
     public:

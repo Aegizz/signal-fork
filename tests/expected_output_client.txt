@@ -2,9 +2,7 @@
 > Hello message sent
 > Client list request sent
 
->  Chat message sent
-
-
+>  Public chat message sent
 
 Client list received
 

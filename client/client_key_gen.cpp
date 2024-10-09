@@ -123,6 +123,14 @@ int Client_Key_Gen::rsaEncrypt(EVP_PKEY* pubKey, const unsigned char* plaintext,
 
     if (EVP_PKEY_encrypt_init(ctx) <= 0) handleErrors();
 
+    // Set the padding to RSA-OAEP
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) handleErrors();
+
+    // Set the OAEP hash function to SHA-256
+    if (EVP_PKEY_CTX_set_rsa_oaep_md(ctx, EVP_sha256()) <= 0) handleErrors();
+
+    if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0) handleErrors();  // Ensure MGF1 is SHA-256
+
     // Determine buffer length for the encrypted data
     size_t encrypted_len;
     if (EVP_PKEY_encrypt(ctx, NULL, &encrypted_len, plaintext, plaintext_len) <= 0) handleErrors();
@@ -144,6 +152,14 @@ int Client_Key_Gen::rsaDecrypt(EVP_PKEY* privKey, const unsigned char* encrypted
 
     if (EVP_PKEY_decrypt_init(ctx) <= 0) handleErrors();
 
+    // Set the padding to RSA-OAEP
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) handleErrors();
+
+    // Set the OAEP hash function to SHA-256
+    if (EVP_PKEY_CTX_set_rsa_oaep_md(ctx, EVP_sha256()) <= 0) handleErrors();
+
+    if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0) handleErrors();  // Ensure MGF1 is SHA-256
+
     // Determine buffer length for the decrypted data
     size_t decrypted_len;
     if (EVP_PKEY_decrypt(ctx, NULL, &decrypted_len, encrypted, encrypted_len) <= 0) handleErrors();
@@ -151,8 +167,21 @@ int Client_Key_Gen::rsaDecrypt(EVP_PKEY* privKey, const unsigned char* encrypted
     *decrypted = (unsigned char*)OPENSSL_malloc(decrypted_len);
     if (*decrypted == NULL) handleErrors();
 
+    // Zero the allocated buffer
+    memset(*decrypted, 0, decrypted_len);
+
     // Decrypt the data
-    if (EVP_PKEY_decrypt(ctx, *decrypted, &decrypted_len, encrypted, encrypted_len) <= 0) handleErrors();
+    if (EVP_PKEY_decrypt(ctx, *decrypted, &decrypted_len, encrypted, encrypted_len) <= 0) {
+        // If decryption fails, check the error code
+        /*unsigned long err_code = ERR_get_error();
+        if (err_code) {
+            char err_buf[120];
+            ERR_error_string_n(err_code, err_buf, sizeof(err_buf));
+            std::cerr << "Decryption failed: " << err_buf << std::endl;
+        }*/
+        EVP_PKEY_CTX_free(ctx);
+        return -1;  // Return -1 to indicate decryption failure
+    }
 
     EVP_PKEY_CTX_free(ctx);
     return decrypted_len;  // Return length of the decrypted data
@@ -164,6 +193,18 @@ int Client_Key_Gen::rsaSign(EVP_PKEY* privKey, const unsigned char* data, size_t
 
     // Initialize signing context
     if (EVP_PKEY_sign_init(ctx) <= 0) handleErrors();
+
+    // Set the padding scheme to RSA-PSS
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) <= 0) handleErrors();
+
+    // Set the hash algorithm for the PSS scheme (SHA-256 in this case)
+    if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) handleErrors();
+
+    // Set the MGF1 (Mask Generation Function) to SHA-256
+    if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0) handleErrors();
+
+    // Set the salt length
+    if (EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, 32) <= 0) handleErrors();
 
     // Determine the buffer length for the signature
     size_t signature_len;
@@ -185,6 +226,18 @@ int Client_Key_Gen::rsaVerify(EVP_PKEY* pubKey, const unsigned char* data, size_
 
     // Initialize verification context
     if (EVP_PKEY_verify_init(ctx) <= 0) handleErrors();
+    
+    // Set the padding scheme to RSA-PSS
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PSS_PADDING) <= 0) handleErrors();
+
+    // Set the hash algorithm for the PSS scheme (SHA-256)
+    if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) handleErrors();
+
+    // Set the MGF1 (Mask Generation Function) to SHA-256
+    if (EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, EVP_sha256()) <= 0) handleErrors();
+
+    // Set the salt length
+    if (EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, 32) <= 0) handleErrors();
 
     // Verify the signature
     int result = EVP_PKEY_verify(ctx, signature, signature_len, data, data_len);

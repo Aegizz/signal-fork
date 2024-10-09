@@ -10,6 +10,7 @@
 #include "../client/websocket_metadata.h"
 #include "../client/DataMessage.h"
 #include "../client/Fingerprint.h"
+#include "../client/client_utilities.h"
 
 using websocketpp::connection_hdl;
 
@@ -23,7 +24,6 @@ void testSendAndReceive(SignedData& signedData, EVP_PKEY* privateKey, std::vecto
     // Sending a signed message
     signedData.sendSignedMessage(data, privateKey, endpoint, id, counter);
 
-
     nlohmann::json message_json;
 
     message_json["type"] = "signed_data";
@@ -34,7 +34,6 @@ void testSendAndReceive(SignedData& signedData, EVP_PKEY* privateKey, std::vecto
     std::string json_string = message_json.dump();
 
     // Create a mock signed message for testing decryption
-
     std::string mockMessageStr = message_json.dump();
 
     // Attempt to decrypt the signed message
@@ -48,15 +47,12 @@ void testSendAndReceive(SignedData& signedData, EVP_PKEY* privateKey, std::vecto
     }
 }
 
-ClientList * global_client_list = nullptr;
+ClientList* global_client_list = new ClientList;
 
 #include <unistd.h>  // For fork(), exec(), and kill()
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>  // For SIGTERM
-
-
-// Your existing includes and code...
 
 int main() {
     // Load keys
@@ -66,7 +62,7 @@ int main() {
         std::cerr << "Failed to load private key!" << std::endl;
         return 1; // Exit if key loading fails
     }
-    if (!publicKey){
+    if (!publicKey) {
         std::cerr << "Failed to load public key!" << std::endl;
         return 1;
     }
@@ -96,6 +92,12 @@ int main() {
     // Mock connection metadata
     int id = endpoint.connect("ws://localhost:9002", global_client_list); // Example connection ID
 
+    // Wait for client to connect to server
+    sleep(1);
+
+    // Send hello message to confirm connection
+    ClientUtilities::send_hello_message(&endpoint, id, privateKey, publicKey, 1);
+
     // Create an instance of SignedData
     SignedData signedData;
 
@@ -106,8 +108,8 @@ int main() {
     EVP_PKEY_free(privateKey); // Free the private key when done
 
     // Terminate the server after client operations
-    kill(server_pid, SIGTERM); // Send a termination signal to the server
-    waitpid(server_pid, nullptr, 0); // Wait for the server process to terminate
+    kill(server_pid, SIGTERM);  // Send termination signal to the server
+    waitpid(server_pid, nullptr, 0);
 
     return 0;
 }
